@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily DSA Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase (Compat SDK for simplicity with vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #0f172a;
+            --muted: #475569;
+            --card: #f8fafc;
+            --accent: #2563eb;
+            --accent-2: #16a34a;
+            --accent-3: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+            --ring: 0 0 0 3px rgba(37, 99, 235, 0.25);
+            --link: #7c3aed;
+            --easy: #22c55e;
+            --medium: #f59e0b;
+            --hard: #ef4444;
+        }
+
+        .dark {
+            --bg: #0b1220;
+            --fg: #e5e7eb;
+            --muted: #a1a1aa;
+            --card: #0f172a;
+            --accent: #60a5fa;
+            --accent-2: #34d399;
+            --accent-3: #fbbf24;
+            --danger: #f87171;
+            --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+            --ring: 0 0 0 3px rgba(96, 165, 250, 0.35);
+            --link: #a78bfa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: linear-gradient(120deg, var(--bg), color-mix(in oklab, var(--bg) 75%, var(--card)));
+            color: var(--fg);
+            transition: background 300ms ease, color 300ms ease;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: 1.5fr 1.2fr 1.2fr;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 16px;
+            border: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        button {
+            font-weight: 700;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: transform 0.15s ease, background 0.25s ease;
+        }
+
+        button:hover {
+            background: color-mix(in oklab, var(--accent) 85%, black);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        .time {
+            font-size: clamp(28px, 4vw, 48px);
+            font-weight: 800;
+            white-space: nowrap;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            font-family: "Courier New", monospace;
+            letter-spacing: 2px;
+        }
+
+        #clock {
+            min-width: 140px;
+            text-align: right;
+        }
+
+        #ampm {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .day {
+            background: color-mix(in oklab, var(--card) 70%, var(--accent) 5%);
+            border-radius: 12px;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+            align-content: start;
+            min-height: 76px;
+            border: 1px solid color-mix(in oklab, var(--fg) 10%, transparent);
+        }
+
+        .day:hover {
+            background: color-mix(in oklab, var(--accent) 20%, var(--card));
+            cursor: pointer;
+        }
+
+        .day header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .daynum {
+            font-weight: 800;
+        }
+
+        .streak-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+            background: color-mix(in oklab, var(--accent-2) 70%, var(--card));
+            border: 2px solid color-mix(in oklab, var(--accent-2) 70%, transparent);
+        }
+
+        .miss-dot {
+            background: color-mix(in oklab, var(--danger) 70%, var(--card));
+            border-color: color-mix(in oklab, var(--danger) 70%, transparent);
+        }
+
+        .questions label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+
+        .questions label a {
+            font-weight: 600;
+        }
+
+        /* Checkbox styling */
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--muted);
+            border-radius: 6px;
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            background: var(--bg);
+            transition: all 0.2s ease;
+        }
+
+        input[type="checkbox"]:hover {
+            border-color: var(--accent);
+        }
+
+        input[type="checkbox"]:checked {
+            background: var(--accent-2);
+            border-color: var(--accent-2);
+        }
+
+        input[type="checkbox"]:checked::after {
+            content: "✔";
+            color: white;
+            font-size: 12px;
+            position: absolute;
+            left: 2px;
+            top: -1px;
+        }
+
+        .questions label.easy input[type="checkbox"]:checked {
+            background: var(--easy);
+            border-color: var(--easy);
+        }
+
+        .questions label.medium input[type="checkbox"]:checked {
+            background: var(--medium);
+            border-color: var(--medium);
+        }
+
+        .questions label.hard input[type="checkbox"]:checked {
+            background: var(--hard);
+            border-color: var(--hard);
+        }
+
+        .day input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .day input[type="checkbox"]:checked {
+            background: var(--accent-2);
+            border-color: var(--accent-2);
+        }
+
+        /* Calendar navigation */
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .calendar-nav button {
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 14px;
+            background: var(--accent-3);
+        }
+
+        .calendar-nav button:hover {
+            background: color-mix(in oklab, var(--accent-3) 85%, black);
+        }
+
+        .calendar-nav #monthLabel {
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        /* Reset menu */
+        .reset-menu {
+            position: absolute;
+            top: 110%;
+            right: 0;
+            background: var(--card);
+            box-shadow: var(--shadow);
+            border-radius: 12px;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(-5px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+        }
+
+        .reset-menu button {
+            background: var(--accent-2);
+            font-size: 14px;
+            padding: 6px 10px;
+        }
+
+        .reset-menu button:hover {
+            background: color-mix(in oklab, var(--accent-2) 85%, black);
+        }
+
+        .reset-menu.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                font-size: 14px;
+                /* smaller text for small screens */
+                padding: 0 8px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .container {
+                grid-template-columns: 1fr;
+                /* single column */
+                gap: 12px;
+            }
+
+            .time {
+                font-size: 24px;
+            }
+
+            button {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+
+            .calendar {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 4px;
+            }
+
+            .day {
+                min-height: 60px;
+                padding: 6px;
+            }
+        }
+
+        .header>div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .countdown-input {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .countdown-input input {
+            max-width: 100%;
+        }
+
+        #userName {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Mobile layout */
+        @media (max-width: 768px) {
+            .container {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .card {
+                width: 100%;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .calendar {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 4px;
+            }
+        }
+
+        /* Desktop: calendar spans all 3 columns */
+        @media (min-width: 769px) {
+            .calendar-card {
+                grid-column: 1 / 4;
+            }
+        }
+
+        /* Mobile: calendar takes full width */
+        @media (max-width: 768px) {
+            .calendar-card {
+                width: 100% !important;
+                align-self: stretch;
+                display: block;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .calendar {
+                display: grid;
+                grid-template-columns: repeat(7, minmax(48px, 1fr));
+                overflow-x: auto;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .calendar {
+                display: grid;
+                grid-template-columns: repeat(7, minmax(60px, 1fr));
+                /* wider cells */
+                overflow-x: auto;
+            }
+
+            .day {
+                min-height: 80px;
+                /* give space */
+                padding: 6px;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: flex-start;
+            }
+
+            .day label {
+                font-size: 11px;
+                /* smaller text */
+                display: flex;
+                gap: 4px;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .day input[type="checkbox"] {
+                flex-shrink: 0;
+                /* checkbox won’t shrink */
+            }
+        }
+
+        #countdown {
+            font-size: clamp(24px, 3vw, 40px);
+            font-weight: 800;
+            white-space: nowrap;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            font-family: "Courier New", monospace;
+            letter-spacing: 0px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .countdown-input button {
+            width: 100px;
+            /* make it smaller */
+        }
+
+        .countdown-input {
+            display: flex;
+            flex-direction: column;
+            /* stack input + button */
+            align-items: center;
+            /* center align */
+            gap: 25px;
+            /* space between them */
+        }
+
+        .reset-menu {
+            right: auto;
+            left: 0;
+            min-width: 160px;
+        }
+
+        .calendar {
+            grid-template-columns: repeat(7, minmax(70px, 1fr));
+        }
+
+        @media (max-width: 500px) {
+            #countdown {
+                font-size: 18px;
+                flex-wrap: wrap;
+                text-align: center;
+            }
+        }
+
+        button:hover {
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .day input[type="checkbox"]:checked+span {
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .questions label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 24px;
+            /* keeps all labels equal height */
+        }
+
+        input[type="checkbox"] {
+            flex-shrink: 0;
+            /* checkbox doesn’t shrink */
+        }
+
+        .questions-container {
+            display: flex;
+            flex-direction: row;
+            min-height: 90px;
+            /* keeps height stable */
+            justify-content: space-between;
+            /* pushes button to bottom */
+            gap: 10px;
+        }
+
+        #newQsBtn {
+            align-self: flex-start;
+            /* keeps button left aligned */
+            margin-top: 15px;
+        }
+
+        #all-questions {
+            align-self: flex-start;
+            margin-top: 15px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding: 20px;
+            text-align: center;
+            background: var(--bg);
+            /* match website background */
+            color: var(--text);
+            font-weight: 600;
+            border-top: 2px solid var(--accent);
+            /* subtle accent line */
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .footer p {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .footer span {
+            font-weight: 800;
+            color: var(--accent);
+            /* highlight Monty with site accent color */
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: var(--link);
+            font-size: 14px;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            background: rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        /* Daily Tasks */
+        #daily-tasks {
+            margin-top: 0px;
+            padding: 10px;
+        }
+
+        /* Popup styles */
+        .popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .popup.hidden {
+            display: none;
+        }
+
+        .popup-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .popup-buttons button {
+            margin: 5px;
+        }
+
+        /* Task list styling */
+        .task-list {
+            list-style: none;
+            /* removes dots */
+            padding: 0;
+            margin: 0;
+        }
+
+        .task-list li {
+            display: flex;
+            align-items: center;
+            /* aligns checkbox + text */
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        .task-list input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .remove-btn {
+            margin-left: auto;
+            background: #ffcccc;
+            /* light red background */
+            color: #b30000;
+            /* dark red text */
+            border: none;
+            padding: 4px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .remove-btn:hover {
+            background: #ff9999;
+            /* slightly darker on hover */
+            color: #800000;
+            /* deeper red text */
+        }
+
+        /* Whole Daily Tasks block */
+        #daily-tasks {
+            padding-left: 20px;
+            /* pushes entire block from left */
+        }
+
+        /* Task list styling */
+        .task-list li {
+            display: flex;
+            align-items: center;
+            margin: 2px 0;
+            padding: 6px 8px;
+            border-radius: 5px;
+            padding-left: 10px;
+            /* extra space inside each task */
+        }
+
+        .task-list span {
+            font-size: 18px;
+            /* slightly larger text */
+            /* spacing between checkbox & text */
+        }
+
+        .task-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .task-header h2 {
+            margin: 5;
+            font-size: 25px;
+        }
+
+        /* Date input box */
+        .countdown-input input[type="date"] {
+            padding: 10px 14px;
+            border: 1px solid var(--muted);
+            border-radius: 12px;
+            font-size: 15px;
+            background: var(--card);
+            color: var(--fg);
+            box-shadow: var(--shadow);
+            transition: border 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+            max-width: 220px;
+            text-align: center;
+        }
+
+        .countdown-input input[type="date"]:focus {
+            outline: none;
+            border: 1px solid var(--accent);
+            box-shadow: var(--ring);
+        }
+
+        /* Base date input styling */
+        .countdown-input input[type="date"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background: var(--card);
+            color: var(--fg);
+            position: relative;
+        }
+
+        /* Default calendar icon → dark for light mode */
+        .countdown-input input[type="date"]::-webkit-calendar-picker-indicator {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23000000' viewBox='0 0 24 24'%3E%3Cpath d='M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm12 18H5V10h14v10z'/%3E%3C/svg%3E") no-repeat center;
+            background-size: 18px 18px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+
+        /* Dark mode → invert to make it white */
+        .dark .countdown-input input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+
+        .popup-content {
+            background: var(--card);
+            color: var(--fg);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
+        }
+
+        .popup-content h3 {
+            margin-top: 0;
+            /* removes default big gap above */
+            margin-bottom: 16px;
+            /* smaller space below heading */
+            font-size: 20px;
+            /* make heading consistent */
+            font-weight: 700;
+        }
+
+        .popup-content input {
+            margin-bottom: 16px;
+            /* space between input and buttons */
+        }
+
+        .popup-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            /* space between OK and Cancel */
+        }
+
+        .popup-content input[type="text"] {
+            width: 100%;
+            max-width: 250px;
+            padding: 10px 14px;
+            border: 1px solid var(--muted);
+            border-radius: 12px;
+            font-size: 15px;
+            background: var(--card);
+            color: var(--fg);
+            box-shadow: var(--shadow);
+            transition: border 0.2s ease, box-shadow 0.2s ease;
+            text-align: center;
+        }
+
+        .popup-content input[type="text"]:focus {
+            outline: none;
+            border: 1px solid var(--accent);
+            box-shadow: var(--ring);
+        }
+
+
+        /*  .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-areas:
+                "clock countdown questions"
+                "tasks tasks tasks"
+                "calendar calendar calendar";
+        }
+
+        /* Assign grid placement */
+        /*   .card.clock-card {
+            grid-area: clock;
+        }
+
+        .card.countdown-card {
+            grid-area: countdown;
+        }
+
+        .card.questions-card {
+            grid-area: questions;
+        }
+
+        #daily-tasks {
+            grid-area: tasks;
+        }
+
+        .calendar-card {
+            grid-area: calendar;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-areas:
+                "clock countdown questions"
+                "tasks tasks tasks"
+                "calendar calendar calendar";
+        }
+
+    */
+        /* Desktop layout only */
+        @media (min-width: 1025px) {
+            .container {
+                display: grid;
+                gap: 16px;
+                grid-template-columns: repeat(3, 1fr);
+                grid-template-areas:
+                    "clock countdown questions"
+                    "tasks tasks tasks"
+                    "calendar calendar calendar";
+            }
+
+            /* Assign grid areas */
+            .clock-card {
+                grid-area: clock;
+            }
+
+            .countdown-card {
+                grid-area: countdown;
+            }
+
+            .questions-card {
+                grid-area: questions;
+            }
+
+            #daily-tasks {
+                grid-area: tasks;
+            }
+
+            .calendar-card {
+                grid-area: calendar;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="title">Daily DSA Tracker</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button class="theme-toggle" id="themeBtn">🌙 Toggle Dark Mode</button>
+            <div style="position:relative;">
+                <button id="resetBtn">♻ Reset</button>
+                <div id="resetMenu" class="reset-menu">
+                    <button onclick="resetAll()">Reset All Data</button>
+                    <button onclick="resetCountdown()">Reset Countdown</button>
+                    <button onclick="resetQuestions()">Reset Daily Questions</button>
+                    <button onclick="resetAttendance()">Reset Attendance</button>
+                    <button onclick="resetGoogleData()">Reset Google Account Data</button>
+                </div>
+            </div>
+            <button id="loginBtn">🔑 Login with Google</button>
+            <button id="logoutBtn" style="display:none;">🚪 Logout</button>
+            <span id="userName" style="margin-left:8px; font-weight:600;"></span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div class="time">
+                <span id="clock"></span>
+                <span id="ampm"></span>
+            </div>
+            <div class="date" id="date"></div>
+        </div>
+
+        <div class="card">
+            <h3>Countdown to Target Date</h3>
+            <div id="countdown"></div>
+            <div class="countdown-input">
+                <input type="date" id="targetDate" />
+                <button onclick="saveTargetDate()">Save</button>
+            </div>
+        </div>
+        <div class="card">
+            <h3>Daily Questions</h3>
+            <div class="questions" id="questions"></div>
+            <div class="questions-container">
+                <button id="newQsBtn" onclick="refreshQuestions()">New Questions</button>
+                <button id="all-questions">All Questions</button>
+            </div>
+        </div>
+        <div id="daily-tasks" class="card">
+            <div class="task-header">
+                <h2>Daily Tasks</h2>
+                <button id="add-task-btn">+ New Task</button>
+            </div>
+            <ul id="task-list" class="task-list"></ul>
+        </div>
+
+        <div class="card calendar-card">
+            <div class="calendar-nav">
+                <button onclick="prevMonth()">⬅ Prev</button>
+                <div id="monthLabel"></div>
+                <button onclick="nextMonth()">Next ➡</button>
+            </div>
+            <div class="calendar" id="calendar"></div>
+        </div>
+    </div>
+
+    <script>
+        /*** ---------- Firebase Setup (replace with your config) ---------- ***/
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGTeBcrFHvpoDtS-6LZVOIwAFL-pLLVDc",
+            authDomain: "dsa-tracker-75ab8.firebaseapp.com",
+            projectId: "dsa-tracker-75ab8",
+            storageBucket: "dsa-tracker-75ab8.firebasestorage.app",
+            messagingSenderId: "216830071601",
+            appId: "1:216830071601:web:105fcb359e51ff20a91610",
+            measurementId: "G-7ZY48TJZBL"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        /*** ---------- Helpers ---------- ***/
+        const $ = (id) => document.getElementById(id);
+        const todayKey = () => new Date().toISOString().split('T')[0];
+        const getUserRef = (uid) => db.collection("users").doc(uid);
+
+        function debounce(fn, wait = 400) {
+            let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+        }
+
+        // Cloud save wrapper
+        const cloudSave = debounce(async (patch) => {
+            const user = auth.currentUser;
+            if (!user) return; // not logged in → skip cloud save
+            try { await getUserRef(user.uid).set(patch, { merge: true }); }
+            catch (e) { console.error("Cloud save failed:", e); }
+        }, 500);
+
+        async function cloudLoadAll() {
+            const user = auth.currentUser;
+            if (!user) return null;
+            try {
+                const snap = await getUserRef(user.uid).get();
+                return snap.exists ? snap.data() : {};
+            } catch (e) {
+                console.error("Cloud load failed:", e);
+                return {};
+            }
+        }
+
+        /*** ---------- UI: Time & Date ---------- ***/
+        const clockEl = $('clock'), ampmEl = $('ampm'), dateEl = $('date');
+        function updateTime() {
+            const now = new Date();
+            let h = now.getHours();
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            // h = h % 12 || 12; // 12-hour format to avoid width jump
+            clockEl.textContent = `${String(h).padStart(2, '0')}:${m}:${s}`;
+            ampmEl.textContent = ampm;
+            dateEl.textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        setInterval(updateTime, 1000); updateTime();
+
+        /*** ---------- Countdown ---------- ***/
+        const countdownEl = $('countdown');
+        const targetDateInput = $('targetDate');
+
+        function renderCountdown() {
+            const saved = localStorage.getItem('targetDate');
+            if (saved) targetDateInput.value = saved;
+            const target = saved ? new Date(saved + "T00:00:00") : null;
+            if (!target) {
+                countdownEl.textContent = 'Set a target date';
+                return;
+            }
+
+            function update() {
+                const now = new Date();
+                const diffMs = target - now;
+
+                if (diffMs <= 0) {
+                    countdownEl.textContent = "🎉 Target date reached!";
+                    clearInterval(window._countdownTimer);
+                    return;
+                }
+
+                const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+                const mins = Math.floor((diffMs / (1000 * 60)) % 60);
+                const secs = Math.floor((diffMs / 1000) % 60);
+
+                countdownEl.textContent =
+                    `${days}d : ${String(hours).padStart(2, '0')}h : ${String(mins).padStart(2, '0')}m : ${String(secs).padStart(2, '0')}s`;
+            }
+
+            update();
+            if (window._countdownTimer) clearInterval(window._countdownTimer);
+            window._countdownTimer = setInterval(update, 1000); // update every second
+        }
+
+
+        function saveTargetDate() {
+            const val = targetDateInput.value || '';
+            localStorage.setItem('targetDate', val);
+            renderCountdown();
+            // cloud persist
+            cloudSave({ targetDate: val });
+        }
+
+        /*** ---------- Daily Questions ---------- ***/
+        const leetQuestions = [
+            { title: "Two Sum", url: "https://leetcode.com/problems/two-sum/", diff: "easy" },
+            { title: "Add Two Numbers", url: "https://leetcode.com/problems/add-two-numbers/", diff: "medium" },
+            { title: "Median of Two Sorted Arrays", url: "https://leetcode.com/problems/median-of-two-sorted-arrays/", diff: "hard" },
+            { title: "Valid Parentheses", url: "https://leetcode.com/problems/valid-parentheses/", diff: "easy" },
+            { title: "Merge Intervals", url: "https://leetcode.com/problems/merge-intervals/", diff: "medium" },
+            { title: "LFU Cache", url: "https://leetcode.com/problems/lfu-cache/", diff: "hard" }
+        ];
+
+        function getStoredSolved() {
+            try { return JSON.parse(localStorage.getItem('solved') || '{}'); } catch { return {}; }
+        }
+        function setStoredSolved(obj) {
+            localStorage.setItem('solved', JSON.stringify(obj));
+            cloudSave({ solved: obj });
+        }
+
+        function renderQuestions() {
+            const container = $('questions');
+            container.innerHTML = '';
+            const lastDate = localStorage.getItem('lastQsDate');
+            if (lastDate !== todayKey()) {
+                localStorage.removeItem('todayQs');
+            }
+            let chosen = [];
+            try { chosen = JSON.parse(localStorage.getItem('todayQs') || '[]'); } catch { chosen = []; }
+            if (chosen.length === 0) {
+                chosen = [...leetQuestions].sort(() => 0.5 - Math.random()).slice(0, 3);
+                localStorage.setItem('todayQs', JSON.stringify(chosen));
+                localStorage.setItem('lastQsDate', todayKey());
+                cloudSave({ todayQs: chosen, lastQsDate: todayKey() });
+            }
+
+            const solved = getStoredSolved();
+            chosen.forEach(q => {
+                const label = document.createElement('label');
+                label.classList.add(q.diff);
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = !!solved[q.title];
+                cb.addEventListener('change', () => {
+                    solved[q.title] = cb.checked;
+                    setStoredSolved(solved);
+                });
+                const a = document.createElement('a');
+                a.href = q.url; a.target = '_blank'; a.textContent = `${q.title} (${q.diff})`;
+                a.style.color = `var(--${q.diff})`;
+                label.appendChild(cb); label.appendChild(a);
+                container.appendChild(label);
+            });
+        }
+
+        function refreshQuestions() {
+            localStorage.removeItem('todayQs');
+            localStorage.setItem('lastQsDate', todayKey());
+            cloudSave({ todayQs: firebase.firestore.FieldValue.delete(), lastQsDate: todayKey() });
+            renderQuestions();
+        }
+
+        /*** ---------- Attendance Calendar ---------- ***/
+        const calendarEl = $('calendar');
+        const monthLabel = $('monthLabel');
+        let view = new Date();
+        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        function saveMonthData(year, month, data) {
+            const key = `att-${year}-${month}`;
+            localStorage.setItem(key, JSON.stringify(data));
+            // save only this month patch to cloud
+            cloudSave({ attendance: { [key]: data } });
+        }
+        function loadMonthData(year, month) {
+            try { return JSON.parse(localStorage.getItem(`att-${year}-${month}`) || '{}'); } catch { return {}; }
+        }
+
+        function renderStreakBanner() {
+            let streak = 0, max = 0;
+
+            // Iterate over all saved months in sorted order
+            const allKeys = Object.keys(localStorage)
+                .filter(k => k.startsWith("att-"))
+                .sort();
+
+            allKeys.forEach(k => {
+                const data = JSON.parse(localStorage.getItem(k) || "{}");
+                const days = Object.keys(data).map(Number).sort((a, b) => a - b);
+
+                for (let d of days) {
+                    if (data[d]) {
+                        streak++;
+                        if (streak > max) max = streak;
+                    } else {
+                        streak = 0;
+                    }
+                }
+            });
+
+            // Show current view + overall max streak
+            monthLabel.textContent =
+                view.toLocaleDateString([], { month: 'long', year: 'numeric' }) +
+                ` (Overall Max streak: ${max})`;
+        }
+
+
+        function renderCalendar() {
+            calendarEl.innerHTML = '';
+            weekdays.forEach(w => {
+                const h = document.createElement('div');
+                h.className = 'weekday'; h.textContent = w; calendarEl.appendChild(h);
+            });
+            const year = view.getFullYear(); const month = view.getMonth();
+            const firstDayIdx = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const data = loadMonthData(year, month);
+
+            for (let i = 0; i < firstDayIdx; i++) calendarEl.appendChild(document.createElement('div'));
+
+            const today = new Date();
+            const isCurrentMonth = (today.getFullYear() === year && today.getMonth() === month);
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cell = document.createElement('div'); cell.className = 'day';
+                const header = document.createElement('header');
+                const dn = document.createElement('div'); dn.className = 'daynum'; dn.textContent = day; header.appendChild(dn);
+                const dot = document.createElement('span'); dot.className = 'streak-dot ' + (data[day] ? '' : 'miss-dot'); header.appendChild(dot);
+                cell.appendChild(header);
+
+                const row = document.createElement('label');
+                const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!data[day]; cb.style.marginRight = '6px';
+                if (!(isCurrentMonth && day === today.getDate())) { cb.disabled = true; cb.title = "Only today's date can be marked"; }
+                row.appendChild(cb);
+                row.appendChild(document.createTextNode('Attended'));
+                cell.appendChild(row);
+
+                cb.addEventListener('change', () => {
+                    data[day] = cb.checked;
+                    dot.classList.toggle('miss-dot', !cb.checked);
+                    saveMonthData(year, month, data);
+                    renderStreakBanner();
+                });
+
+                if (isCurrentMonth && day === today.getDate()) {
+                    cell.style.outline = '2px dashed ' + getComputedStyle(document.documentElement).getPropertyValue('--link');
+                    cell.style.outlineOffset = '2px';
+                }
+                calendarEl.appendChild(cell);
+            }
+            renderStreakBanner(year, month, data);
+        }
+        function prevMonth() { view.setMonth(view.getMonth() - 1); renderCalendar(); }
+        function nextMonth() { view.setMonth(view.getMonth() + 1); renderCalendar(); }
+
+        /*** ---------- Theme toggle ---------- ***/
+        $('themeBtn').addEventListener('click', () => {
+            const isDark = document.body.classList.toggle('dark');
+            const theme = isDark ? 'dark' : 'light';
+            localStorage.setItem('theme', theme);
+            cloudSave({ theme }); // 🔥 save to Google
+        });
+
+
+        /*** ---------- Reset menu ---------- ***/
+        const resetBtn = $('resetBtn'), resetMenu = $('resetMenu');
+        resetBtn.addEventListener('click', () => resetMenu.classList.toggle('show'));
+        document.addEventListener('click', (e) => {
+            if (!resetBtn.contains(e.target) && !resetMenu.contains(e.target)) resetMenu.classList.remove('show');
+        });
+
+        async function resetAll() {
+            localStorage.clear();
+            const user = auth.currentUser;
+            if (user) {
+                await getUserRef(user.uid).set({
+                    targetDate: firebase.firestore.FieldValue.delete(),
+                    solved: firebase.firestore.FieldValue.delete(),
+                    todayQs: firebase.firestore.FieldValue.delete(),
+                    lastQsDate: firebase.firestore.FieldValue.delete(),
+                    attendance: firebase.firestore.FieldValue.delete()
+                }, { merge: true });
+            }
+            location.reload();
+        }
+        function resetCountdown() {
+            localStorage.removeItem("targetDate");
+            cloudSave({ targetDate: firebase.firestore.FieldValue.delete() });
+            renderCountdown();
+        }
+        function resetQuestions() {
+            localStorage.removeItem("todayQs");
+            localStorage.removeItem("lastQsDate");
+            localStorage.removeItem("solved");
+            cloudSave({
+                todayQs: firebase.firestore.FieldValue.delete(),
+                lastQsDate: firebase.firestore.FieldValue.delete(),
+                solved: firebase.firestore.FieldValue.delete()
+            });
+            renderQuestions();
+        }
+        function resetAttendance() {
+            Object.keys(localStorage).forEach(k => { if (k.startsWith("att-")) localStorage.removeItem(k); });
+            cloudSave({ attendance: firebase.firestore.FieldValue.delete() });
+            renderCalendar();
+        }
+        async function resetGoogleData() {
+            const user = auth.currentUser;
+            if (!user) {
+                alert("You must be logged in to reset Google data.");
+                return;
+            }
+
+            if (!confirm("⚠ This will permanently delete all your data from Google Cloud. Continue?")) {
+                return;
+            }
+
+            try {
+                await getUserRef(user.uid).set({
+                    targetDate: firebase.firestore.FieldValue.delete(),
+                    solved: firebase.firestore.FieldValue.delete(),
+                    todayQs: firebase.firestore.FieldValue.delete(),
+                    lastQsDate: firebase.firestore.FieldValue.delete(),
+                    attendance: firebase.firestore.FieldValue.delete()
+                }, { merge: true });
+
+                alert("✅ All your Google account data has been reset.");
+            } catch (e) {
+                console.error("Error resetting Google data:", e);
+                alert("❌ Failed to reset Google account data. Check console.");
+            }
+        }
+
+
+        /*** ---------- Auth UI & Data Bootstrap ---------- ***/
+        const loginBtn = $('loginBtn'), logoutBtn = $('logoutBtn'), userName = $('userName');
+
+        loginBtn.addEventListener('click', async () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+
+            // Force fresh account selection every time
+            provider.setCustomParameters({
+                prompt: 'select_account'   // always show account picker
+            });
+
+            try {
+                if (/Mobi|Android/i.test(navigator.userAgent)) {
+                    // Mobile → use redirect
+                    await auth.signInWithRedirect(provider);
+                } else {
+                    // Desktop → popup works fine
+                    await auth.signInWithPopup(provider);
+                }
+            } catch (e) {
+                console.error("Login failed:", e);
+            }
+        });
+
+        // // Handle redirect result after Google login (needed for mobile)
+        // auth.getRedirectResult().then((result) => {
+        //     if (result.user) {
+        //         console.log("Logged in as:", result.user.displayName);
+        //     }
+        // }).catch((error) => {
+        //     console.error("Redirect login error:", error);
+        // });
+
+
+        // Handle redirect result after returning from Google login
+        auth.getRedirectResult()
+            .then((result) => {
+                if (result.user) {
+                    console.log("✅ Redirect login success:", result.user.displayName);
+                    // Fire onAuthStateChanged will handle the rest
+                }
+            })
+            .catch((error) => {
+                console.error("❌ Redirect login error:", error);
+            });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await auth.signOut();
+                console.log("Logged out successfully");
+                loginBtn.style.display = "inline-block";
+                logoutBtn.style.display = "none";
+                userName.textContent = "";
+            } catch (e) {
+                console.error("Logout failed:", e);
+            }
+        });
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // --- UI updates ---
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'inline-block';
+                userName.textContent = `Hello, ${user.displayName || user.email}`;
+
+                // --- Load cloud data ---
+                const data = await cloudLoadAll();
+                if (data) {
+                    if (data.targetDate) localStorage.setItem("targetDate", data.targetDate);
+                    if (data.solved) localStorage.setItem("solved", JSON.stringify(data.solved));
+                    if (data.todayQs) {
+                        localStorage.setItem("todayQs", JSON.stringify(data.todayQs));
+                        localStorage.setItem("lastQsDate", data.lastQsDate);
+                    }
+                    if (data.attendance) {
+                        Object.entries(data.attendance).forEach(([k, v]) =>
+                            localStorage.setItem(k, JSON.stringify(v))
+                        );
+                    }
+                    if (data.theme) {
+                        localStorage.setItem("theme", data.theme);
+                        document.body.classList.toggle("dark", data.theme === "dark");
+                    }
+                }
+
+                // --- Render UI after hydration ---
+                renderCountdown();
+                renderQuestions();
+                renderCalendar();
+
+            } else {
+                // --- Not logged in ---
+                userName.textContent = '';
+                loginBtn.style.display = 'inline-block';
+                logoutBtn.style.display = 'none';
+
+                // --- Render from localStorage (offline mode) ---
+                if (localStorage.getItem("theme") === "dark") {
+                    document.body.classList.add("dark");
+                } else {
+                    document.body.classList.remove("dark");
+                }
+
+                renderCountdown();
+                renderQuestions();
+                renderCalendar();
+            }
+        });
+
+
+        // auth.onAuthStateChanged(async (user) => {
+        //     if (user) {
+        //         loginBtn.style.display = "none";
+        //         logoutBtn.style.display = "inline-block";
+        //         userName.textContent = user.displayName || user.email;
+
+        //         // Load cloud data on login
+        //         const data = await cloudLoadAll();
+
+        //         if (data?.targetDate) {
+        //             localStorage.setItem("targetDate", data.targetDate);
+        //         }
+        //         if (data?.theme) {
+        //             localStorage.setItem("theme", data.theme);
+        //             if (data.theme === "dark") {
+        //                 document.body.classList.add("dark");
+        //             } else {
+        //                 document.body.classList.remove("dark");
+        //             }
+        //         }
+
+        //         if (data?.solved) {
+        //             localStorage.setItem("solved", JSON.stringify(data.solved));
+        //         }
+        //         if (data?.todayQs) {
+        //             localStorage.setItem("todayQs", JSON.stringify(data.todayQs));
+        //             localStorage.setItem("lastQsDate", data.lastQsDate);
+        //         }
+        //         if (data?.attendance) {
+        //             Object.entries(data.attendance).forEach(([k, v]) =>
+        //                 localStorage.setItem(k, JSON.stringify(v))
+        //             );
+        //         }
+
+        //         renderCountdown();
+        //         renderQuestions();
+        //         renderCalendar();
+        //     } else {
+        //         loginBtn.style.display = "inline-block";
+        //         logoutBtn.style.display = "none";
+        //         userName.textContent = "";
+        //     }
+        // });
+
+        // auth.onAuthStateChanged(async (user) => {
+        //     if (user) {
+        //         loginBtn.style.display = 'none';
+        //         logoutBtn.style.display = 'inline-block';
+
+        //         // 1. Load cloud data
+        //         const data = await cloudLoadAll();
+
+        //         // 2. Update localStorage
+        //         if (data) hydrateLocalStorage(data);
+
+        //         // 3. Render AFTER hydration
+        //         renderCountdown();
+        //         renderQuestions();
+        //         renderCalendar();
+
+        //         userName.textContent = `Hello, ${user.displayName}`;
+        //     } else {
+        //         // Not logged in
+        //         userName.textContent = '';
+        //         loginBtn.style.display = 'inline-block';
+        //         logoutBtn.style.display = 'none';
+
+        //         // Normal render from local storage
+        //         renderCountdown();
+        //         renderQuestions();
+        //         renderCalendar();
+        //     }
+        // });
+
+
+        /*** ---------- Initial Render ---------- ***/
+        // Ensure question set is for today
+        const lastDate = localStorage.getItem('lastQsDate');
+        if (lastDate !== todayKey()) {
+            localStorage.removeItem('todayQs');
+            localStorage.setItem('lastQsDate', todayKey());
+        }
+        renderCountdown();
+        renderQuestions();
+        renderCalendar();
+        document.getElementById('all-questions').addEventListener('click', () => {
+            window.open("https://leetcode.com/problemset/all/", "_blank");
+        });
+        // ================= Daily Tasks =================
+        const addTaskBtn = document.getElementById("add-task-btn");
+        const taskPopup = document.getElementById("task-popup");
+        const taskInput = document.getElementById("task-input");
+        const taskOk = document.getElementById("task-ok");
+        const taskCancel = document.getElementById("task-cancel");
+        const taskList = document.getElementById("task-list");
+
+        let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+        let lastTaskReset = localStorage.getItem("lastTaskReset");
+
+        // Reset checkboxes daily at 12 AM
+        function resetDailyTasksIfNeeded() {
+            const today = new Date().toDateString();
+            if (lastTaskReset !== today) {
+                tasks.forEach(t => t.done = false); // reset checkboxes
+                localStorage.setItem("tasks", JSON.stringify(tasks));
+                localStorage.setItem("lastTaskReset", today);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // ================= Daily Tasks =================
+            const addTaskBtn = document.getElementById("add-task-btn");
+            const taskPopup = document.getElementById("task-popup");
+            const taskInput = document.getElementById("task-input");
+            const taskOk = document.getElementById("task-ok");
+            const taskCancel = document.getElementById("task-cancel");
+            const taskList = document.getElementById("task-list");
+
+            let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+            let lastTaskReset = localStorage.getItem("lastTaskReset");
+
+            // Reset checkboxes daily at 12 AM
+            function resetDailyTasksIfNeeded() {
+                const today = new Date().toDateString();
+                if (lastTaskReset !== today) {
+                    tasks.forEach(t => t.done = false); // reset checkboxes
+                    localStorage.setItem("tasks", JSON.stringify(tasks));
+                    localStorage.setItem("lastTaskReset", today);
+                }
+            }
+
+            // Render tasks
+            function renderTasks() {
+                resetDailyTasksIfNeeded();
+                taskList.innerHTML = "";
+                tasks.forEach((task, index) => {
+                    const li = document.createElement("li");
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = task.done;
+                    checkbox.addEventListener("change", () => {
+                        task.done = checkbox.checked;
+                        localStorage.setItem("tasks", JSON.stringify(tasks));
+                    });
+
+                    const span = document.createElement("span");
+                    span.textContent = task.text;
+
+                    const removeBtn = document.createElement("button");
+                    removeBtn.textContent = "❌";
+                    removeBtn.classList.add("remove-btn");
+                    removeBtn.addEventListener("click", () => {
+                        tasks.splice(index, 1);
+                        localStorage.setItem("tasks", JSON.stringify(tasks));
+                        renderTasks();
+                    });
+
+                    li.appendChild(checkbox);
+                    li.appendChild(span);
+                    li.appendChild(removeBtn);
+                    taskList.appendChild(li);
+                });
+            }
+
+
+            // Open popup
+            addTaskBtn.addEventListener("click", () => {
+                taskPopup.classList.remove("hidden");
+                taskInput.value = "";
+                taskInput.focus();
+            });
+
+            // Close popup
+            taskCancel.addEventListener("click", () => {
+                taskPopup.classList.add("hidden");
+            });
+
+            // Add new task
+            taskOk.addEventListener("click", () => {
+                const text = taskInput.value.trim();
+                if (text) {
+                    tasks.push({ text, done: false });
+                    localStorage.setItem("tasks", JSON.stringify(tasks));
+                    renderTasks();
+                }
+                taskPopup.classList.add("hidden");
+            });
+
+            // Initial render
+            renderTasks();
+        });
+
+    </script>
+    <footer class="footer">
+        <p>🚀 Daily DSA Tracker — Made with ❤️ by <span>Monty</span></p>
+        <div class="footer-links">
+            <!-- <a href="https://leetcode.com/problemset/all/" target="_blank">LeetCode</a>
+    <a href="https://github.com/" target="_blank">GitHub</a>
+    <a href="mailto:yourmail@example.com">Contact</a> -->
+        </div>
+    </footer>
+    <!-- Task Popup -->
+    <div id="task-popup" class="popup hidden">
+        <div class="popup-content">
+            <h3>Add New Task</h3>
+            <input type="text" id="task-input" placeholder="Enter task..." />
+            <div class="popup-buttons">
+                <button id="task-ok">OK</button>
+                <button id="task-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
